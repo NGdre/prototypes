@@ -10,7 +10,6 @@ export function TaskList() {
 	return (
 		<WithNavigationKeys>
 			<VirtualList
-				height={5}
 				data={tasks}
 				renderItem={({item, index, isSelected, isVisible}) => (
 					<TaskRenderer

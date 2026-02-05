@@ -31,6 +31,10 @@ export type VirtualListProps<T> = {
 	initialSelectedIndex?: number;
 	/** Начальный offset скролла */
 	initialScrollOffset?: number;
+	/** Автоматически подстраивать высоту под размер терминала */
+	autoHeight?: boolean;
+	/** Отступ от края терминала при autoHeight */
+	terminalMargin?: number;
 };
 
 export function VirtualList<T>({
@@ -43,6 +47,8 @@ export function VirtualList<T>({
 	onSelect,
 	initialSelectedIndex = 0,
 	initialScrollOffset = 0,
+	autoHeight = false,
+	terminalMargin = 4,
 }: VirtualListProps<T>) {
 	const [scrollOffset, setScrollOffset] = useState(initialScrollOffset);
 	const [selectedIndex, setSelectedIndex] = useState(
@@ -52,11 +58,14 @@ export function VirtualList<T>({
 	const {stdout} = useStdout();
 	const [terminalHeight, setTerminalHeight] = useState(height);
 
-	// Автоматическая подстройка под размер терминала
 	useEffect(() => {
-		const actualHeight = stdout?.rows ? stdout.rows - 4 : height;
-		setTerminalHeight(Math.max(actualHeight, 1));
-	}, [stdout?.rows, height]);
+		if (autoHeight && stdout?.rows) {
+			const actualHeight = stdout.rows - terminalMargin;
+			setTerminalHeight(Math.max(actualHeight, 1));
+		} else {
+			setTerminalHeight(Math.max(height, 1));
+		}
+	}, [stdout?.rows, height, autoHeight, terminalMargin]);
 
 	// Сброс выбранного индекса при изменении данных
 	useEffect(() => {
