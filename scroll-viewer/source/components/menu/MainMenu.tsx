@@ -6,10 +6,11 @@ import {
 	TextInputContainerProps,
 } from '../TextInputContainer.js';
 
-type TaskFields = {
+export type TaskFields = {
 	title: string;
 	description?: string;
-	deadline?: Date;
+	deadline?: string;
+	scheduledAt?: string;
 };
 
 type DisplayStatus = 'text_input' | 'menu' | 'list';
