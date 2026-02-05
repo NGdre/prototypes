@@ -1,8 +1,8 @@
 import {Box, Text} from 'ink';
 import React from 'react';
-import {TaskFields} from '../menu/MainMenu.js';
 import {RenderItemProps} from '../ui/VirtualList.js';
 import {getRandomDate} from '../../utils.js';
+import {TaskFields} from '../menu/NewTaskMenu.js';
 
 export function TaskRenderer<T extends TaskFields>({
 	item: task,

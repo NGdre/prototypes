@@ -1,109 +1,40 @@
-import React, {useMemo, useRef, useState} from 'react';
-import {MenuManager} from '../ui/MenuManager.js';
-import {MenuItem} from '../ui/Menu.js';
-import {
-	TextInputContainer,
-	TextInputContainerProps,
-} from '../TextInputContainer.js';
+import SelectInput from 'ink-select-input';
+import React from 'react';
+import {Text} from 'ink';
+import {useRouter} from '../router/Router.js';
 
-export type TaskFields = {
-	title: string;
-	description?: string;
-	deadline?: string;
-	scheduledAt?: string;
-};
+const items = [
+	{
+		label: 'Новая задача',
+		value: 'NEW_TASK',
+	},
+	{
+		label: 'Показать все задачи',
+		value: 'ALL_TASKS',
+	},
+	{
+		label: 'Выход',
+		value: 'EXIT',
+	},
+];
 
-type DisplayStatus = 'text_input' | 'menu' | 'list';
+export function NewMainMenu() {
+	const {navigate} = useRouter();
 
-export default function MainMenu() {
-	const newTaskFields = useRef<TaskFields | null>(null);
-	const [displayStatus, setDisplayStatus] = useState<DisplayStatus>('menu');
-	const [textInputProps, setTextInputProps] =
-		useState<TextInputContainerProps | null>(null);
-	const [tasks, setTasks] = useState<TaskFields[]>([]);
-
-	if (newTaskFields.current) console.log(newTaskFields.current);
-
-	console.log(tasks);
-
-	const items = useMemo<MenuItem[]>(
-		() => [
-			{
-				label: 'Новая задача',
-				value: 'NEW_TASK',
-				submenu: [
-					{
-						label: 'Название задачи',
-						value: 'TASK_TITLE',
-						action() {
-							setDisplayStatus('text_input');
-							setTextInputProps({
-								label: 'Название задачи',
-								onSubmit(inputValue) {
-									newTaskFields.current = Object.assign(
-										{},
-										newTaskFields.current,
-										{title: inputValue},
-									);
-
-									setDisplayStatus('menu');
-								},
-							});
-						},
-					},
-					{
-						label: 'Описание задачи',
-						value: 'TASK_DESCRIPTION',
-						action() {
-							setDisplayStatus('text_input');
-							setTextInputProps({
-								label: 'Описание задачи',
-								onSubmit(inputValue) {
-									newTaskFields.current = Object.assign(
-										{},
-										newTaskFields.current,
-										{description: inputValue},
-									);
-
-									setDisplayStatus('menu');
-								},
-							});
-						},
-					},
-					{
-						label: 'Готово!',
-						value: 'BACK',
-						action() {
-							if (newTaskFields.current)
-								setTasks(prevTasks => {
-									return [...prevTasks, newTaskFields.current!];
-								});
-							newTaskFields.current = null;
-						},
-					},
-				],
-			},
-			{
-				label: 'Показать все задачи',
-				value: 'ALL_TASKS',
-				action() {
-					setDisplayStatus('list');
-				},
-			},
-			{
-				label: 'Выход',
-				value: 'EXIT',
-			},
-		],
-		[],
-	);
+	function handleSelect(item: (typeof items)[number]) {
+		if (item.value === 'NEW_TASK') navigate('new-task');
+		if (item.value === 'ALL_TASKS') navigate('all-tasks');
+		if (item.value === 'EXIT') process.exit(0);
+	}
 
 	return (
 		<>
-			<MenuManager menuItems={items} show={displayStatus === 'menu'} />
-			{displayStatus === 'text_input' && (
-				<TextInputContainer {...textInputProps} hideOnSumbit />
-			)}
+			<Text>Главное меню</Text>
+			<SelectInput
+				items={items}
+				onSelect={handleSelect}
+				itemComponent={({label}) => <Text>{label}</Text>}
+			/>
 		</>
 	);
 }
