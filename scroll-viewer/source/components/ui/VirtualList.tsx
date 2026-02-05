@@ -35,6 +35,7 @@ export type VirtualListProps<T> = {
 	autoHeight?: boolean;
 	/** Отступ от края терминала при autoHeight */
 	terminalMargin?: number;
+	additionalHints?: string;
 };
 
 export function VirtualList<T>({
@@ -49,6 +50,7 @@ export function VirtualList<T>({
 	initialScrollOffset = 0,
 	autoHeight = false,
 	terminalMargin = 4,
+	additionalHints = '',
 }: VirtualListProps<T>) {
 	const [scrollOffset, setScrollOffset] = useState(initialScrollOffset);
 	const [selectedIndex, setSelectedIndex] = useState(
@@ -254,12 +256,13 @@ export function VirtualList<T>({
 			)}
 
 			{/* Подсказки по управлению */}
-			{showControlsHint && data.length > terminalHeight && (
+			{showControlsHint && (
 				<Box marginTop={1}>
 					<Text dimColor>
 						↑↓ - Навигация | PgUp/PgDn - Быстрая прокрутка | Home/End - В
 						начало/конец
 						{onSelect && ' | Enter - Выбрать'}
+						{additionalHints}
 					</Text>
 				</Box>
 			)}

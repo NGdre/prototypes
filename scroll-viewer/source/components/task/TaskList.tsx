@@ -19,6 +19,7 @@ export function TaskList() {
 						item={item}
 					/>
 				)}
+				additionalHints=" | m - Главное меню | b - Назад"
 			/>
 		</WithNavigationKeys>
 	);
