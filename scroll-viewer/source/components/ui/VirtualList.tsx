@@ -52,11 +52,11 @@ export function VirtualList<T>({
 }: VirtualListProps<T>) {
 	const [scrollOffset, setScrollOffset] = useState(initialScrollOffset);
 	const [selectedIndex, setSelectedIndex] = useState(
-		Math.min(initialSelectedIndex, data.length - 1),
+		data.length > 0 ? Math.min(initialSelectedIndex, data.length - 1) : -1,
 	);
 	const containerRef = useRef(null);
 	const {stdout} = useStdout();
-	const [terminalHeight, setTerminalHeight] = useState(height);
+	const [terminalHeight, setTerminalHeight] = useState(Math.max(height, 1));
 
 	useEffect(() => {
 		if (autoHeight && stdout?.rows) {
@@ -69,12 +69,16 @@ export function VirtualList<T>({
 
 	// Сброс выбранного индекса при изменении данных
 	useEffect(() => {
-		if (selectedIndex >= data.length) {
+		if (data.length === 0) {
+			setSelectedIndex(-1);
+		} else if (selectedIndex >= data.length) {
 			setSelectedIndex(Math.max(0, data.length - 1));
 		}
 	}, [data.length, selectedIndex]);
 
 	useInput((input, key) => {
+		if (data.length === 0) return;
+
 		if (key.upArrow) {
 			setSelectedIndex(prev => {
 				const newIndex = Math.max(0, prev - 1);
@@ -83,8 +87,8 @@ export function VirtualList<T>({
 					setScrollOffset(newIndex);
 				}
 
-				if (onSelect && newIndex !== prev) {
-					onSelect(data[newIndex]!, newIndex);
+				if (onSelect && newIndex !== prev && data[newIndex]) {
+					onSelect(data[newIndex], newIndex);
 				}
 
 				return newIndex;
@@ -99,8 +103,8 @@ export function VirtualList<T>({
 					setScrollOffset(Math.max(0, newIndex - terminalHeight + 1));
 				}
 
-				if (onSelect && newIndex !== prev) {
-					onSelect(data[newIndex]!, newIndex);
+				if (onSelect && newIndex !== prev && data[newIndex]) {
+					onSelect(data[newIndex], newIndex);
 				}
 
 				return newIndex;
@@ -117,14 +121,14 @@ export function VirtualList<T>({
 			setScrollOffset(newOffset);
 			setSelectedIndex(newIndex);
 
-			if (onSelect) {
-				onSelect(data[newIndex]!, newIndex);
+			if (onSelect && data[newIndex]) {
+				onSelect(data[newIndex], newIndex);
 			}
 		}
 
 		if (key.pageDown) {
 			const newOffset = Math.min(
-				data.length - terminalHeight,
+				Math.max(0, data.length - terminalHeight),
 				scrollOffset + terminalHeight,
 			);
 			const newIndex = Math.max(newOffset, 0);
@@ -132,8 +136,8 @@ export function VirtualList<T>({
 			setScrollOffset(newOffset);
 			setSelectedIndex(newIndex);
 
-			if (onSelect) {
-				onSelect(data[newIndex]!, newIndex);
+			if (onSelect && data[newIndex]) {
+				onSelect(data[newIndex], newIndex);
 			}
 		}
 
@@ -141,8 +145,8 @@ export function VirtualList<T>({
 			setScrollOffset(0);
 			setSelectedIndex(0);
 
-			if (onSelect) {
-				onSelect(data[0]!, 0);
+			if (onSelect && data[0]) {
+				onSelect(data[0], 0);
 			}
 		}
 
@@ -153,14 +157,14 @@ export function VirtualList<T>({
 			setScrollOffset(newOffset);
 			setSelectedIndex(newIndex);
 
-			if (onSelect) {
-				onSelect(data[newIndex]!, newIndex);
+			if (onSelect && data[newIndex]) {
+				onSelect(data[newIndex], newIndex);
 			}
 		}
 
 		if (input === ' ' || key.rightArrow) {
 			const newOffset = Math.min(
-				data.length - terminalHeight,
+				Math.max(0, data.length - terminalHeight),
 				scrollOffset + terminalHeight,
 			);
 			const newIndex = Math.max(newOffset, 0);
@@ -168,8 +172,8 @@ export function VirtualList<T>({
 			setScrollOffset(newOffset);
 			setSelectedIndex(newIndex);
 
-			if (onSelect) {
-				onSelect(data[newIndex]!, newIndex);
+			if (onSelect && data[newIndex]) {
+				onSelect(data[newIndex], newIndex);
 			}
 		}
 
@@ -183,14 +187,14 @@ export function VirtualList<T>({
 			setScrollOffset(newOffset);
 			setSelectedIndex(newIndex);
 
-			if (onSelect) {
-				onSelect(data[newIndex]!, newIndex);
+			if (onSelect && data[newIndex]) {
+				onSelect(data[newIndex], newIndex);
 			}
 		}
 
 		// Enter для выбора
-		if (key.return && onSelect) {
-			onSelect(data[selectedIndex]!, selectedIndex);
+		if (key.return && onSelect && selectedIndex >= 0 && data[selectedIndex]) {
+			onSelect(data[selectedIndex], selectedIndex);
 		}
 	});
 
@@ -220,7 +224,7 @@ export function VirtualList<T>({
 					const isSelected = absoluteIndex === selectedIndex;
 
 					return (
-						<Box key={String(item[itemKey] || absoluteIndex)}>
+						<Box key={String(item[itemKey] ?? absoluteIndex)}>
 							{renderItem({
 								item,
 								index: absoluteIndex,
@@ -240,14 +244,10 @@ export function VirtualList<T>({
 						{Math.min(scrollOffset + terminalHeight, data.length)} из{' '}
 						{data.length}
 					</Text>
-					<Text> | </Text>
-					<Text color="yellow">Выбрано: {selectedIndex + 1}</Text>
-					{itemKey && data[selectedIndex] && (
+					{selectedIndex >= 0 && (
 						<>
 							<Text> | </Text>
-							<Text color="green">
-								ID: {String(data[selectedIndex][itemKey])}
-							</Text>
+							<Text color="green">Выбрано: {selectedIndex + 1}</Text>
 						</>
 					)}
 				</Box>
