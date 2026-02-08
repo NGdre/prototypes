@@ -1,0 +1,1 @@
+The prototype was created because I wanted to try to configure ink project without template builder like `npx create-ink-app my-ink-cli`, which has outdated versions of packages and undesirable configs
