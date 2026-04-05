@@ -1,20 +1,33 @@
-import { useMemo } from "react";
-import VirtualList, { type ListItem } from "./VirtualList";
+import { useRef, useState } from "react";
+import VirtualList from "./VirtualList";
+import { fetchPage, type ListItem } from "./api/fetchPage";
 
-const ITEMS_AMOUNT = 1000;
+const PAGE_LIMIT = 30;
 
 function App() {
-  const items: ListItem[] = useMemo(() => {
-    const arr = [];
+  const [items, setItems] = useState<ListItem[]>([]);
+  const isLoading = useRef(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [currPage, setCurrPage] = useState(0);
 
-    for (let i = 0; i < ITEMS_AMOUNT; i++) {
-      arr.push({ id: i + "", name: `Item ${i}` });
-    }
+  async function handleFetchPage() {
+    if (isLoading.current || !hasMore) return;
 
-    return arr;
-  }, []);
+    isLoading.current = true;
+    const nextPage = currPage + 1;
+    const { hasMore: more, items: newItems } = await fetchPage(
+      nextPage,
+      PAGE_LIMIT,
+    );
 
-  return <VirtualList items={items} />;
+    setHasMore(more);
+    setCurrPage(nextPage);
+    setItems((prev) => [...prev, ...newItems]);
+
+    isLoading.current = false;
+  }
+
+  return <VirtualList items={items} onEndReached={handleFetchPage} />;
 }
 
 export default App;

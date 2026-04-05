@@ -1,16 +1,17 @@
-import { useMemo, useState } from "react";
-
-export interface ListItem {
-  id: string;
-  name: string;
-}
+import { useEffect, useMemo, useState } from "react";
+import type { ListItem } from "./api/fetchPage";
 
 export interface VirtualListProps {
   items: ListItem[];
   overscan?: number;
+  onEndReached?: () => void;
 }
 
-export default function VirtualList({ items, overscan = 3 }: VirtualListProps) {
+export default function VirtualList({
+  items,
+  overscan = 3,
+  onEndReached,
+}: VirtualListProps) {
   const [scrollTop, setScrollTop] = useState(0);
 
   const itemHeight = 30;
@@ -22,6 +23,12 @@ export default function VirtualList({ items, overscan = 3 }: VirtualListProps) {
     items.length - 1,
     Math.ceil((scrollTop + containerHeight) / itemHeight) + overscan,
   );
+
+  useEffect(() => {
+    if (endIndex >= items.length - 1 - overscan) {
+      onEndReached?.();
+    }
+  }, [endIndex, overscan, items.length]);
 
   const visibleItems = useMemo(() => {
     const result = [];
