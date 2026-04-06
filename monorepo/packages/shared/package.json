@@ -1,0 +1,14 @@
+{
+  "name": "@monorepo/shared",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "packageManager": "pnpm@10.33.0",
+  "dependencies": {
+    "lodash": "^4.18.1"
+  }
+}

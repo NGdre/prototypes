@@ -1,0 +1,14 @@
+{
+  "name": "monorepo",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "clean": "rm -rf dist",
+    "start:server": "pnpm --filter @monorepo/server start",
+    "start:client": "pnpm --filter @monorepo/client start",
+    "build:server": "pnpm clean & pnpm --filter @monorepo/server deploy dist/server --prod",
+    "serve:server": "node dist/server/index.js"
+  },
+  "packageManager": "pnpm@10.33.0"
+}
