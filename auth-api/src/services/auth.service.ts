@@ -1,4 +1,5 @@
 import { env, parseExpiryToMs } from "../config/env.js";
+import bcrypt from "bcrypt";
 import { RefreshTokenModel } from "../models/refreshToken.model.js";
 import { UserModel } from "../models/user.model.js";
 import { VerificationTokenModel } from "../models/verificationToken.model.js";
@@ -10,6 +11,12 @@ import {
 } from "../utils/jwt.js";
 import { generateSecureToken, hashToken } from "../utils/token.js";
 import { EmailService } from "./email.service.js";
+
+// Hash of a throwaway password: bcrypt.compare against it is run when the
+// user is not found so that login response time does not depend on whether
+// an account exists (timing-attack protection).
+const DUMMY_HASH =
+  "$2b$12$..fykbTQHAgrjaNUjwFMbOFzjLMozBnWPP8kW040zQTU8Z0T/mlia";
 
 export class AuthService {
   private static async createVerificationToken(
@@ -37,7 +44,12 @@ export class AuthService {
 
   static async register(email: string, password: string) {
     const existing = await UserModel.findByEmail(email);
-    if (existing) throw new Error("Email already registered");
+    if (existing) {
+      // Same response for existing and new emails prevents an attacker from
+      // telling whether an account is registered (OWASP Authentication Cheat
+      // Sheet — user enumeration protection).
+      return { message: "Registration successful" };
+    }
 
     const user = await UserModel.create(email, password);
 
@@ -48,32 +60,26 @@ export class AuthService {
     );
     await EmailService.sendVerificationEmail(email, verifyToken);
 
-    const payload: TokenPayload = { userId: user.id, email };
-
-    const accessToken = generateAccessToken(payload);
-    const refreshToken = generateRefreshToken(payload);
-
-    const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 7);
-    await RefreshTokenModel.create(user.id, refreshToken, expiresAt);
-
-    return {
-      user: {
-        id: user.id,
-        email: user.email,
-        emailVerified: user.email_verified,
-      },
-      accessToken,
-      refreshToken,
-    };
+    // No tokens are issued at registration: the response contract must be
+    // identical for both branches above, otherwise they are distinguishable
+    // by response shape. Sign-in happens via /login.
+    return { message: "Registration successful" };
   }
 
   static async login(email: string, password: string) {
     const user = await UserModel.findByEmail(email);
-    if (!user) throw new Error("Invalid credentials");
+    if (!user) {
+      // Dummy bcrypt.compare equalizes response time: otherwise account
+      // enumeration is possible by measuring login latency.
+      await bcrypt.compare(password, DUMMY_HASH);
+      throw new Error("Invalid credentials");
+    }
 
     const isMatch = await UserModel.comparePassword(user, password);
     if (!isMatch) throw new Error("Invalid credentials");
+
+    // Sign-in is allowed for unverified emails — verification does not
+    // block account usage (product requirement).
 
     const payload: TokenPayload = { userId: user.id, email };
 

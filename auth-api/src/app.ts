@@ -6,13 +6,16 @@ import morgan from "morgan";
 import { errorHandler } from "./middlewares/errorHandler.js";
 import { authRateLimiter } from "./middlewares/rateLimiter.js";
 import authRoutes from "./routes/auth.routes.js";
+import { env } from "./config/env.js";
 
 const app: Express = express();
 
+app.set("trust proxy", env.TRUST_PROXY);
+
 app.use(helmet());
-app.use(cors());
+app.use(cors({ origin: env.FRONTEND_URL }));
 app.use(compression());
-app.use(express.json());
+app.use(express.json({ limit: "10kb" }));
 app.use(morgan("combined"));
 
 app.use("/api/auth", authRateLimiter);

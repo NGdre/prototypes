@@ -1,14 +1,26 @@
 import dotenv from "dotenv";
 dotenv.config();
 
+function requireEnv(name: string, devDefault: string): string {
+  const value = process.env[name];
+  if (value) return value;
+  if (process.env.NODE_ENV === "production") {
+    throw new Error(`Missing required environment variable: ${name}`);
+  }
+  return devDefault;
+}
+
 export const env = {
   PORT: parseInt(process.env.PORT || "4000", 10),
   NODE_ENV: process.env.NODE_ENV || "development",
   DATABASE_URL:
     process.env.DATABASE_URL || "postgresql://localhost:5432/auth_db",
-  JWT_ACCESS_SECRET: process.env.JWT_ACCESS_SECRET || "default-access-secret",
-  JWT_REFRESH_SECRET:
-    process.env.JWT_REFRESH_SECRET || "default-refresh-secret",
+  JWT_ACCESS_SECRET: requireEnv("JWT_ACCESS_SECRET", "default-access-secret"),
+  JWT_REFRESH_SECRET: requireEnv(
+    "JWT_REFRESH_SECRET",
+    "default-refresh-secret",
+  ),
+  TRUST_PROXY: process.env.TRUST_PROXY || "0",
   ACCESS_TOKEN_EXPIRY: process.env.ACCESS_TOKEN_EXPIRY || "15m",
   REFRESH_TOKEN_EXPIRY: process.env.REFRESH_TOKEN_EXPIRY || "7d",
   PASSWORD_RESET_TOKEN_EXPIRY: process.env.PASSWORD_RESET_TOKEN_EXPIRY || "1h",

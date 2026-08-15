@@ -42,7 +42,15 @@ export class UserModel {
     const salt = await bcrypt.genSalt(12);
     const hashed = await bcrypt.hash(password, salt);
     const id = uuidv4();
-    await db("users").insert({ id, email, password: hashed });
+    try {
+      await db("users").insert({ id, email, password: hashed });
+    } catch (error) {
+      const uniquenessConstraintCode = "23505";
+      if ((error as { code?: string }).code === uniquenessConstraintCode) {
+        throw new Error("Email already registered");
+      }
+      throw error;
+    }
     return (await db("users").where({ id }).first())!;
   }
 
