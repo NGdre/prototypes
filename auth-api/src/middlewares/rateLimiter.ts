@@ -1,5 +1,8 @@
 import { Request } from "express";
-import rateLimit, { RateLimitRequestHandler } from "express-rate-limit";
+import rateLimit, {
+  ipKeyGenerator,
+  RateLimitRequestHandler,
+} from "express-rate-limit";
 
 const attemptsMessage = {
   message: "Too many attempts, please try again later",
@@ -23,7 +26,7 @@ export const authRateLimiter: RateLimitRequestHandler = rateLimit({
 // without ever affecting other users.
 function credentialKeyGenerator(req: Request): string {
   const email = (req.body?.email ?? "").toString().trim().toLowerCase();
-  return `${req.ip}|${email}`;
+  return `${ipKeyGenerator(req.ip ?? "")}|${email}`;
 }
 
 // /login and /forgot-password are the only endpoints that accept raw
