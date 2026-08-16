@@ -40,8 +40,8 @@ export class RefreshTokenModel {
     await db("refresh_tokens").where({ user_id: userId }).delete();
   }
 
-  // Удаление просроченных токенов (можно вызывать периодически)
-  static async deleteExpired(): Promise<void> {
-    await db("refresh_tokens").where("expires_at", "<", new Date()).delete();
+  // Removes expired tokens; called periodically by the cleanup job.
+  static async deleteExpired(): Promise<number> {
+    return db("refresh_tokens").where("expires_at", "<", new Date()).delete();
   }
 }

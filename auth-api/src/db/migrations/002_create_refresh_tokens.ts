@@ -12,9 +12,6 @@ export async function up(knex: Knex): Promise<void> {
     table.text("token").notNullable().unique();
     table.timestamp("expires_at").notNullable();
     table.timestamps(true, true);
-    // Индекс для автоматического удаления истёкших токенов не встроен в PG,
-    // можно добавить задачу очистки, либо просто проверять дату при запросе.
-    // Для простоты оставим ручное удаление при refresh/логауте.
   });
 }
 

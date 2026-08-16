@@ -58,6 +58,8 @@ if (process.env.NODE_ENV === "production" && !process.env.TRUST_PROXY) {
   );
 }
 
+const CLEANUP_CRON_SCHEDULE_DEFAULT = "*/5 * * * *"; // every 5 mins
+
 export const env = {
   PORT: parseInt(process.env.PORT || "4000", 10),
   NODE_ENV: process.env.NODE_ENV || "development",
@@ -76,6 +78,8 @@ export const env = {
   REFRESH_TOKEN_EXPIRY: process.env.REFRESH_TOKEN_EXPIRY || "7d",
   PASSWORD_RESET_TOKEN_EXPIRY: process.env.PASSWORD_RESET_TOKEN_EXPIRY || "1h",
   EMAIL_VERIFY_TOKEN_EXPIRY: process.env.EMAIL_VERIFY_TOKEN_EXPIRY || "24h",
+  CLEANUP_CRON_SCHEDULE:
+    process.env.CLEANUP_CRON_SCHEDULE || CLEANUP_CRON_SCHEDULE_DEFAULT,
   FRONTEND_URL: process.env.FRONTEND_URL || "http://localhost:3000",
   EMAIL_FROM: process.env.EMAIL_FROM || "noreply@localhost",
   SMTP_HOST: process.env.SMTP_HOST || "",

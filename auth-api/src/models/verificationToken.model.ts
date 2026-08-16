@@ -64,4 +64,11 @@ export class VerificationTokenModel {
       .where({ id })
       .update({ used_at: new Date() });
   }
+
+  // Removes expired tokens; called periodically by the cleanup job.
+  static async deleteExpired(): Promise<number> {
+    return db("verification_tokens")
+      .where("expires_at", "<", new Date())
+      .delete();
+  }
 }
