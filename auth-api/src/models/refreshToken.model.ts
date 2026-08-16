@@ -1,3 +1,4 @@
+import { type Knex } from "knex";
 import { v4 as uuidv4 } from "uuid";
 import db from "../config/db.js";
 import { hashToken } from "../utils/token.js";
@@ -15,8 +16,9 @@ export class RefreshTokenModel {
     userId: string,
     rawToken: string,
     expiresAt: Date,
+    trx?: Knex.Transaction,
   ): Promise<void> {
-    await db("refresh_tokens").insert({
+    await (trx ?? db)("refresh_tokens").insert({
       id: uuidv4(),
       user_id: userId,
       // Persist only the hash: if the DB is leaked, the stored values cannot
@@ -28,16 +30,30 @@ export class RefreshTokenModel {
 
   static async findByToken(
     rawToken: string,
+    trx?: Knex.Transaction,
+    forUpdate = false,
   ): Promise<RefreshTokenRecord | undefined> {
-    return db("refresh_tokens").where({ token: hashToken(rawToken) }).first();
+    const query = (trx ?? db)("refresh_tokens").where({
+      token: hashToken(rawToken),
+    });
+    if (forUpdate) query.forUpdate();
+    return query.first();
   }
 
-  static async deleteByToken(rawToken: string): Promise<void> {
-    await db("refresh_tokens").where({ token: hashToken(rawToken) }).delete();
+  static async deleteByToken(
+    rawToken: string,
+    trx?: Knex.Transaction,
+  ): Promise<void> {
+    await (trx ?? db)("refresh_tokens")
+      .where({ token: hashToken(rawToken) })
+      .delete();
   }
 
-  static async deleteAllForUser(userId: string): Promise<void> {
-    await db("refresh_tokens").where({ user_id: userId }).delete();
+  static async deleteAllForUser(
+    userId: string,
+    trx?: Knex.Transaction,
+  ): Promise<void> {
+    await (trx ?? db)("refresh_tokens").where({ user_id: userId }).delete();
   }
 
   // Removes expired tokens; called periodically by the cleanup job.

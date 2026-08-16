@@ -1,4 +1,5 @@
 import bcrypt from "bcrypt";
+import { type Knex } from "knex";
 import { v4 as uuidv4 } from "uuid";
 import db from "../config/db.js";
 import { UserProfile } from "../types/index.js";
@@ -61,21 +62,32 @@ export class UserModel {
     return bcrypt.compare(candidate, user.password);
   }
 
-  static async updatePassword(id: string, password: string): Promise<void> {
+  static async updatePassword(
+    id: string,
+    password: string,
+    trx?: Knex.Transaction,
+  ): Promise<void> {
     const salt = await bcrypt.genSalt(12);
     const hashed = await bcrypt.hash(password, salt);
-    await db("users").where({ id }).update({ password: hashed });
+    await (trx ?? db)("users").where({ id }).update({ password: hashed });
   }
 
-  static async markEmailVerified(id: string): Promise<void> {
-    await db("users").where({ id }).update({
+  static async markEmailVerified(
+    id: string,
+    trx?: Knex.Transaction,
+  ): Promise<void> {
+    await (trx ?? db)("users").where({ id }).update({
       email_verified: true,
       email_verified_at: new Date(),
     });
   }
 
-  static async updateEmail(id: string, email: string): Promise<void> {
-    await db("users").where({ id }).update({
+  static async updateEmail(
+    id: string,
+    email: string,
+    trx?: Knex.Transaction,
+  ): Promise<void> {
+    await (trx ?? db)("users").where({ id }).update({
       email,
       email_verified: true,
       email_verified_at: new Date(),

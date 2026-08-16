@@ -1,5 +1,6 @@
 import bcrypt from "bcrypt";
 import { env, parseExpiryToMs } from "../config/env.js";
+import db from "../config/db.js";
 import { RefreshTokenModel } from "../models/refreshToken.model.js";
 import { UserModel } from "../models/user.model.js";
 import { VerificationTokenModel } from "../models/verificationToken.model.js";
@@ -114,16 +115,6 @@ export class AuthService {
       throw new Error("Invalid refresh token");
     }
 
-    const stored = await RefreshTokenModel.findByToken(oldRefreshToken);
-    if (!stored || stored.expires_at < new Date()) {
-      if (stored) {
-        await RefreshTokenModel.deleteAllForUser(payload.userId);
-      }
-      throw new Error("Refresh token reused or expired – all tokens revoked");
-    }
-
-    await RefreshTokenModel.deleteByToken(oldRefreshToken);
-
     const user = await UserModel.findById(payload.userId);
     if (!user) throw new Error("User not found");
 
@@ -136,7 +127,27 @@ export class AuthService {
 
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 7);
-    await RefreshTokenModel.create(payload.userId, newRefreshToken, expiresAt);
+
+    // Rotation must be atomic: the old token is deleted and the new one
+    // inserted in a single transaction. The old row is locked with FOR
+    // UPDATE so a concurrent request carrying the same token blocks here
+    // and then sees no row – it is treated as reuse and revokes all tokens.
+    await db.transaction(async (trx) => {
+      const stored = await RefreshTokenModel.findByToken(
+        oldRefreshToken,
+        trx,
+        true,
+      );
+      if (!stored || stored.expires_at < new Date()) {
+        if (stored) {
+          await RefreshTokenModel.deleteAllForUser(payload.userId, trx);
+        }
+        throw new Error("Refresh token reused or expired – all tokens revoked");
+      }
+
+      await RefreshTokenModel.deleteByToken(oldRefreshToken, trx);
+      await RefreshTokenModel.create(payload.userId, newRefreshToken, expiresAt, trx);
+    });
 
     return { accessToken: newAccessToken, refreshToken: newRefreshToken };
   }
@@ -163,9 +174,13 @@ export class AuthService {
     const isMatch = await UserModel.comparePassword(user, currentPassword);
     if (!isMatch) throw new Error("Current password is incorrect");
 
-    await UserModel.updatePassword(userId, newPassword);
-    // revoke all sessions on password change
-    await RefreshTokenModel.deleteAllForUser(userId);
+    // Password update and session revocation are atomic: if any step fails,
+    // the transaction rolls back so no old session outlives the new password.
+    await db.transaction(async (trx) => {
+      await UserModel.updatePassword(userId, newPassword, trx);
+      // revoke all sessions on password change
+      await RefreshTokenModel.deleteAllForUser(userId, trx);
+    });
     await EmailService.sendPasswordChangedNotification(user.email);
   }
 
@@ -188,15 +203,13 @@ export class AuthService {
     );
     if (!record) throw new Error("Invalid or expired token");
 
-    await UserModel.updatePassword(record.user_id, newPassword);
-    await VerificationTokenModel.markUsed(record.id);
-
-    /* Revoke all sessions. A password reset can be triggered by anyone in control of the email.
-    If that's an attacker, they could reset the password and create a session on their device.
-    Deleting every refresh token forces a re-login everywhere and kills any attacker session.
-    Also, if an attacker changes password then user will notice that the old password doesn't work */
-
-    await RefreshTokenModel.deleteAllForUser(record.user_id);
+    // Password change, token invalidation and session revocation are atomic:
+    // a partial failure must not leave the token replayable or old sessions alive.
+    await db.transaction(async (trx) => {
+      await UserModel.updatePassword(record.user_id, newPassword, trx);
+      await VerificationTokenModel.markUsed(record.id, trx);
+      await RefreshTokenModel.deleteAllForUser(record.user_id, trx);
+    });
 
     const user = await UserModel.findById(record.user_id);
     if (user) await EmailService.sendPasswordChangedNotification(user.email);
@@ -269,9 +282,11 @@ export class AuthService {
       throw new Error("Email already registered");
     }
 
-    await UserModel.updateEmail(record.user_id, pendingEmail);
-    await VerificationTokenModel.markUsed(record.id);
-    await RefreshTokenModel.deleteAllForUser(record.user_id);
+    await db.transaction(async (trx) => {
+      await UserModel.updateEmail(record.user_id, pendingEmail, trx);
+      await VerificationTokenModel.markUsed(record.id, trx);
+      await RefreshTokenModel.deleteAllForUser(record.user_id, trx);
+    });
 
     const user = await UserModel.findById(record.user_id);
     if (user)

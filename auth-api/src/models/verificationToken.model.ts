@@ -1,3 +1,4 @@
+import { type Knex } from "knex";
 import { v4 as uuidv4 } from "uuid";
 import db from "../config/db.js";
 import { VerificationTokenType } from "../types/index.js";
@@ -59,8 +60,8 @@ export class VerificationTokenModel {
       .first();
   }
 
-  static async markUsed(id: string): Promise<void> {
-    await db("verification_tokens")
+  static async markUsed(id: string, trx?: Knex.Transaction): Promise<void> {
+    await (trx ?? db)("verification_tokens")
       .where({ id })
       .update({ used_at: new Date() });
   }
