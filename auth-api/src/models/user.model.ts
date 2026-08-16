@@ -64,16 +64,13 @@ export class UserModel {
   static async updatePassword(id: string, password: string): Promise<void> {
     const salt = await bcrypt.genSalt(12);
     const hashed = await bcrypt.hash(password, salt);
-    await db("users")
-      .where({ id })
-      .update({ password: hashed, updated_at: new Date() });
+    await db("users").where({ id }).update({ password: hashed });
   }
 
   static async markEmailVerified(id: string): Promise<void> {
     await db("users").where({ id }).update({
       email_verified: true,
       email_verified_at: new Date(),
-      updated_at: new Date(),
     });
   }
 
@@ -82,7 +79,6 @@ export class UserModel {
       email,
       email_verified: true,
       email_verified_at: new Date(),
-      updated_at: new Date(),
     });
   }
 }
