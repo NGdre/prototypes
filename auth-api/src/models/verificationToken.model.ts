@@ -46,11 +46,14 @@ export class VerificationTokenModel {
 
   static async findValid(
     rawToken: string,
+    type: VerificationTokenType,
   ): Promise<VerificationTokenRecord | undefined> {
     const tokenHash = hashToken(rawToken);
 
+    // Type is part of the lookup: an email_verify token must not be
+    // redeemable at /reset-password and vice versa.
     return db("verification_tokens")
-      .where({ token_hash: tokenHash })
+      .where({ token_hash: tokenHash, type })
       .whereNull("used_at")
       .where("expires_at", ">", new Date())
       .first();

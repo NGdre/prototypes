@@ -1,5 +1,5 @@
-import { env, parseExpiryToMs } from "../config/env.js";
 import bcrypt from "bcrypt";
+import { env, parseExpiryToMs } from "../config/env.js";
 import { RefreshTokenModel } from "../models/refreshToken.model.js";
 import { UserModel } from "../models/user.model.js";
 import { VerificationTokenModel } from "../models/verificationToken.model.js";
@@ -45,6 +45,11 @@ export class AuthService {
   static async register(email: string, password: string) {
     const existing = await UserModel.findByEmail(email);
     if (existing) {
+      // A dummy bcrypt.compare burns roughly the same CPU time as the real
+      // hash + email dispatch on the "new account" path, so response latency
+      // does not reveal whether the email already exists either.
+      await bcrypt.compare(password, DUMMY_HASH);
+
       // Same response for existing and new emails prevents an attacker from
       // telling whether an account is registered (OWASP Authentication Cheat
       // Sheet — user enumeration protection).
@@ -177,7 +182,10 @@ export class AuthService {
   }
 
   static async resetPassword(token: string, newPassword: string) {
-    const record = await VerificationTokenModel.findValid(token);
+    const record = await VerificationTokenModel.findValid(
+      token,
+      "password_reset",
+    );
     if (!record) throw new Error("Invalid or expired token");
 
     await UserModel.updatePassword(record.user_id, newPassword);
@@ -195,7 +203,10 @@ export class AuthService {
   }
 
   static async verifyEmail(token: string) {
-    const record = await VerificationTokenModel.findValid(token);
+    const record = await VerificationTokenModel.findValid(
+      token,
+      "email_verify",
+    );
     if (!record) throw new Error("Invalid or expired token");
 
     await UserModel.markEmailVerified(record.user_id);
@@ -244,7 +255,10 @@ export class AuthService {
   }
 
   static async confirmEmailChange(token: string) {
-    const record = await VerificationTokenModel.findValid(token);
+    const record = await VerificationTokenModel.findValid(
+      token,
+      "email_change",
+    );
     if (!record) throw new Error("Invalid or expired token");
 
     const pendingEmail = record.metadata?.pendingEmail as string | undefined;

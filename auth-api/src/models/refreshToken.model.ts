@@ -1,10 +1,11 @@
 import { v4 as uuidv4 } from "uuid";
 import db from "../config/db.js";
+import { hashToken } from "../utils/token.js";
 
 export interface RefreshTokenRecord {
   id: string;
   user_id: string;
-  token: string;
+  token: string; // sha256 hash of the raw refresh token (never the JWT itself)
   expires_at: Date;
   created_at: Date;
 }
@@ -12,25 +13,27 @@ export interface RefreshTokenRecord {
 export class RefreshTokenModel {
   static async create(
     userId: string,
-    token: string,
+    rawToken: string,
     expiresAt: Date,
   ): Promise<void> {
     await db("refresh_tokens").insert({
       id: uuidv4(),
       user_id: userId,
-      token,
+      // Persist only the hash: if the DB is leaked, the stored values cannot
+      // be replayed against /refresh (see migration 004 for the backfill).
+      token: hashToken(rawToken),
       expires_at: expiresAt,
     });
   }
 
   static async findByToken(
-    token: string,
+    rawToken: string,
   ): Promise<RefreshTokenRecord | undefined> {
-    return db("refresh_tokens").where({ token }).first();
+    return db("refresh_tokens").where({ token: hashToken(rawToken) }).first();
   }
 
-  static async deleteByToken(token: string): Promise<void> {
-    await db("refresh_tokens").where({ token }).delete();
+  static async deleteByToken(rawToken: string): Promise<void> {
+    await db("refresh_tokens").where({ token: hashToken(rawToken) }).delete();
   }
 
   static async deleteAllForUser(userId: string): Promise<void> {

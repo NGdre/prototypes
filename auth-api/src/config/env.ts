@@ -1,13 +1,61 @@
 import dotenv from "dotenv";
 dotenv.config();
 
-function requireEnv(name: string, devDefault: string): string {
+// The app treats NODE_ENV === "development" as the only explicitly trusted
+// environment: an unset NODE_ENV in a real deployment must NOT silently fall
+// back to known default secrets (see requireJwtSecret below).
+const isDevelopment = process.env.NODE_ENV === "development";
+
+const MIN_SECRET_LENGTH = 32;
+
+// JWT secrets sign every token this service issues; a known or weak secret
+// lets an attacker forge access/refresh tokens for any user. Startup aborts
+// unless a strong secret is provided:
+//  - missing secret + NODE_ENV not explicitly "development" -> fail hard;
+//  - missing secret in development -> known dev default;
+//  - a secret that is a known default or shorter than 32 chars -> fail hard.
+function requireJwtSecret(name: string, devDefault: string): string {
   const value = process.env[name];
-  if (value) return value;
-  if (process.env.NODE_ENV === "production") {
-    throw new Error(`Missing required environment variable: ${name}`);
+
+  if (!value) {
+    if (!isDevelopment) {
+      throw new Error(`Missing required environment variable: ${name}`);
+    }
+    return devDefault;
   }
-  return devDefault;
+
+  if (value.length < MIN_SECRET_LENGTH) {
+    throw new Error(
+      `Insecure value for ${name}: use a random secret of at least ${MIN_SECRET_LENGTH} characters.`,
+    );
+  }
+
+  return value;
+}
+
+/**
+ * When `trust proxy` is unset the app does NOT trust any proxy. If it runs behind a reverse
+ * proxy without TRUST_PROXY set, req.ip becomes the proxy's address and the
+ * rate limiter would treat every user as a single client.
+ */
+function parseTrustProxy(raw: string | undefined): boolean | number | string {
+  if (!raw) return false;
+  const normalized = raw.trim().toLowerCase();
+  if (normalized === "true" || normalized === "1") return 1;
+  if (normalized === "false" || normalized === "0") return false;
+  const hops = Number(normalized);
+  if (Number.isInteger(hops) && hops > 0) return hops;
+  return normalized;
+}
+
+const TRUST_PROXY = parseTrustProxy(process.env.TRUST_PROXY);
+
+if (process.env.NODE_ENV === "production" && !process.env.TRUST_PROXY) {
+  console.warn(
+    "[env] WARNING: TRUST_PROXY is not set. If this app runs behind a reverse " +
+      "proxy (nginx, etc.), set TRUST_PROXY=1 so rate limiting and logs see " +
+      "real client IPs instead of the proxy's IP.",
+  );
 }
 
 export const env = {
@@ -15,12 +63,15 @@ export const env = {
   NODE_ENV: process.env.NODE_ENV || "development",
   DATABASE_URL:
     process.env.DATABASE_URL || "postgresql://localhost:5432/auth_db",
-  JWT_ACCESS_SECRET: requireEnv("JWT_ACCESS_SECRET", "default-access-secret"),
-  JWT_REFRESH_SECRET: requireEnv(
+  JWT_ACCESS_SECRET: requireJwtSecret(
+    "JWT_ACCESS_SECRET",
+    "default-access-secret",
+  ),
+  JWT_REFRESH_SECRET: requireJwtSecret(
     "JWT_REFRESH_SECRET",
     "default-refresh-secret",
   ),
-  TRUST_PROXY: process.env.TRUST_PROXY || "0",
+  TRUST_PROXY,
   ACCESS_TOKEN_EXPIRY: process.env.ACCESS_TOKEN_EXPIRY || "15m",
   REFRESH_TOKEN_EXPIRY: process.env.REFRESH_TOKEN_EXPIRY || "7d",
   PASSWORD_RESET_TOKEN_EXPIRY: process.env.PASSWORD_RESET_TOKEN_EXPIRY || "1h",

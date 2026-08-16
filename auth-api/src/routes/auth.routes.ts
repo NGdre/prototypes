@@ -2,6 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { AuthController } from "../controllers/auth.controller.js";
 import { authenticate } from "../middlewares/authenticate.js";
+import { credentialRateLimiter } from "../middlewares/rateLimiter.js";
 import { validate } from "../middlewares/validate.js";
 
 const router: Router = Router();
@@ -48,7 +49,12 @@ const confirmEmailChangeSchema = z.object({
 });
 
 router.post("/register", validate(registerSchema), AuthController.register);
-router.post("/login", validate(loginSchema), AuthController.login);
+router.post(
+  "/login",
+  validate(loginSchema),
+  credentialRateLimiter,
+  AuthController.login,
+);
 router.post("/refresh", AuthController.refresh);
 router.post("/logout", AuthController.logout);
 router.get("/me", authenticate, AuthController.me);
@@ -63,6 +69,7 @@ router.patch(
 router.post(
   "/forgot-password",
   validate(forgotPasswordSchema),
+  credentialRateLimiter,
   AuthController.forgotPassword,
 );
 
