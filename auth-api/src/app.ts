@@ -1,4 +1,5 @@
 import compression from "compression";
+import cookieParser from "cookie-parser";
 import cors from "cors";
 import express, { Express } from "express";
 import helmet from "helmet";
@@ -13,9 +14,12 @@ const app: Express = express();
 app.set("trust proxy", env.TRUST_PROXY);
 
 app.use(helmet());
-app.use(cors({ origin: env.FRONTEND_URL }));
+// credentials: true is required so the browser stores/sends the httpOnly
+// refresh cookie on cross-origin requests to this API.
+app.use(cors({ origin: env.FRONTEND_URL, credentials: true }));
 app.use(compression());
 app.use(express.json({ limit: "10kb" }));
+app.use(cookieParser());
 app.use(morgan("combined"));
 
 app.use("/api/auth", authRateLimiter);
