@@ -1,5 +1,6 @@
 import { NextFunction, Response } from "express";
 import { AuthRequest } from "../types/index.js";
+import { AppError } from "../utils/AppError.js";
 import { verifyAccessToken } from "../utils/jwt.js";
 
 export const authenticate = (
@@ -9,7 +10,9 @@ export const authenticate = (
 ) => {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    return res.status(401).json({ message: "Access token missing" });
+    return next(
+      new AppError(401, "Access token missing", "ACCESS_TOKEN_MISSING"),
+    );
   }
 
   const token = authHeader.split(" ")[1];
@@ -18,6 +21,12 @@ export const authenticate = (
     req.userId = decoded.userId;
     next();
   } catch (error) {
-    return res.status(401).json({ message: "Invalid or expired access token" });
+    next(
+      new AppError(
+        401,
+        "Invalid or expired access token",
+        "ACCESS_TOKEN_INVALID",
+      ),
+    );
   }
 };

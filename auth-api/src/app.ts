@@ -4,7 +4,7 @@ import cors from "cors";
 import express, { Express } from "express";
 import helmet from "helmet";
 import morgan from "morgan";
-import { errorHandler } from "./middlewares/errorHandler.js";
+import { errorHandler, notFoundHandler } from "./middlewares/errorHandler.js";
 import { authRateLimiter } from "./middlewares/rateLimiter.js";
 import authRoutes from "./routes/auth.routes.js";
 import { env } from "./config/env.js";
@@ -29,6 +29,7 @@ app.use("/api/auth", authRoutes);
 app.get("/health", (req, res) => res.status(200).send("OK"));
 
 // must be last
+app.use(notFoundHandler);
 app.use(errorHandler);
 
 export default app;

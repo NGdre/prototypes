@@ -11,6 +11,7 @@ import {
   verifyRefreshToken,
 } from "../utils/jwt.js";
 import { generateSecureToken, hashToken } from "../utils/token.js";
+import { AppError } from "../utils/AppError.js";
 import { EmailService } from "./email.service.js";
 
 // Hash of a throwaway password: bcrypt.compare against it is run when the
@@ -78,11 +79,12 @@ export class AuthService {
       // Dummy bcrypt.compare equalizes response time: otherwise account
       // enumeration is possible by measuring login latency.
       await bcrypt.compare(password, DUMMY_HASH);
-      throw new Error("Invalid credentials");
+      throw new AppError(401, "Invalid credentials", "INVALID_CREDENTIALS");
     }
 
     const isMatch = await UserModel.comparePassword(user, password);
-    if (!isMatch) throw new Error("Invalid credentials");
+    if (!isMatch)
+      throw new AppError(401, "Invalid credentials", "INVALID_CREDENTIALS");
 
     // Sign-in is allowed for unverified emails — verification does not
     // block account usage (product requirement).
@@ -112,11 +114,16 @@ export class AuthService {
     try {
       payload = verifyRefreshToken(oldRefreshToken);
     } catch (err) {
-      throw new Error("Invalid refresh token");
+      throw new AppError(
+        401,
+        "Invalid refresh token",
+        "INVALID_REFRESH_TOKEN",
+      );
     }
 
     const user = await UserModel.findById(payload.userId);
-    if (!user) throw new Error("User not found");
+    if (!user)
+      throw new AppError(404, "User not found", "USER_NOT_FOUND");
 
     const newPayload: TokenPayload = {
       userId: payload.userId,
@@ -142,7 +149,11 @@ export class AuthService {
         if (stored) {
           await RefreshTokenModel.deleteAllForUser(payload.userId, trx);
         }
-        throw new Error("Refresh token reused or expired – all tokens revoked");
+        throw new AppError(
+          401,
+          "Refresh token reused or expired – all tokens revoked",
+          "REFRESH_TOKEN_REUSE",
+        );
       }
 
       await RefreshTokenModel.deleteByToken(oldRefreshToken, trx);
@@ -158,7 +169,7 @@ export class AuthService {
 
   static async getProfile(userId: string) {
     const user = await UserModel.findByIdExternal(userId);
-    if (!user) throw new Error("User not found");
+    if (!user) throw new AppError(404, "User not found", "USER_NOT_FOUND");
     return user;
   }
 
@@ -168,11 +179,16 @@ export class AuthService {
     newPassword: string,
   ) {
     const user = await UserModel.findById(userId);
-    if (!user) throw new Error("User not found");
+    if (!user) throw new AppError(404, "User not found", "USER_NOT_FOUND");
 
     // password change is sensitive: require re-authentication
     const isMatch = await UserModel.comparePassword(user, currentPassword);
-    if (!isMatch) throw new Error("Current password is incorrect");
+    if (!isMatch)
+      throw new AppError(
+        401,
+        "Current password is incorrect",
+        "INVALID_CURRENT_PASSWORD",
+      );
 
     // Password update and session revocation are atomic: if any step fails,
     // the transaction rolls back so no old session outlives the new password.
@@ -201,7 +217,7 @@ export class AuthService {
       token,
       "password_reset",
     );
-    if (!record) throw new Error("Invalid or expired token");
+    if (!record) throw new AppError(400, "Invalid or expired token", "INVALID_TOKEN");
 
     // Password change, token invalidation and session revocation are atomic:
     // a partial failure must not leave the token replayable or old sessions alive.
@@ -220,7 +236,7 @@ export class AuthService {
       token,
       "email_verify",
     );
-    if (!record) throw new Error("Invalid or expired token");
+    if (!record) throw new AppError(400, "Invalid or expired token", "INVALID_TOKEN");
 
     await UserModel.markEmailVerified(record.user_id);
     await VerificationTokenModel.markUsed(record.id);
@@ -228,8 +244,9 @@ export class AuthService {
 
   static async resendVerification(userId: string) {
     const user = await UserModel.findById(userId);
-    if (!user) throw new Error("User not found");
-    if (user.email_verified) throw new Error("Email already verified");
+    if (!user) throw new AppError(404, "User not found", "USER_NOT_FOUND");
+    if (user.email_verified)
+      throw new AppError(409, "Email already verified", "EMAIL_ALREADY_VERIFIED");
 
     const verifyToken = await this.createVerificationToken(
       user.id,
@@ -245,18 +262,28 @@ export class AuthService {
     password: string,
   ) {
     const user = await UserModel.findById(userId);
-    if (!user) throw new Error("User not found");
+    if (!user) throw new AppError(404, "User not found", "USER_NOT_FOUND");
 
     // email change is sensitive: require re-authentication
     const isMatch = await UserModel.comparePassword(user, password);
-    if (!isMatch) throw new Error("Current password is incorrect");
+    if (!isMatch)
+      throw new AppError(
+        401,
+        "Current password is incorrect",
+        "INVALID_CURRENT_PASSWORD",
+      );
 
     if (user.email === newEmail) {
-      throw new Error("New email must be different from current email");
+      throw new AppError(
+        400,
+        "New email must be different from current email",
+        "EMAIL_UNCHANGED",
+      );
     }
 
     const existing = await UserModel.findByEmail(newEmail);
-    if (existing) throw new Error("Email already registered");
+    if (existing)
+      throw new AppError(409, "Email already registered", "EMAIL_EXISTS");
 
     const changeToken = await this.createVerificationToken(
       userId,
@@ -272,14 +299,15 @@ export class AuthService {
       token,
       "email_change",
     );
-    if (!record) throw new Error("Invalid or expired token");
+    if (!record) throw new AppError(400, "Invalid or expired token", "INVALID_TOKEN");
 
     const pendingEmail = record.metadata?.pendingEmail as string | undefined;
-    if (!pendingEmail) throw new Error("Invalid or expired token");
+    if (!pendingEmail)
+      throw new AppError(400, "Invalid or expired token", "INVALID_TOKEN");
 
     const existing = await UserModel.findByEmail(pendingEmail);
     if (existing && existing.id !== record.user_id) {
-      throw new Error("Email already registered");
+      throw new AppError(409, "Email already registered", "EMAIL_EXISTS");
     }
 
     await db.transaction(async (trx) => {

@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { AuthService } from "../services/auth.service.js";
 import { AuthRequest } from "../types/index.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
+import { AppError } from "../utils/AppError.js";
 import {
   clearRefreshTokenCookie,
   REFRESH_COOKIE_NAME,
@@ -30,7 +31,7 @@ export class AuthController {
   static refresh = asyncHandler(async (req: Request, res: Response) => {
     const refreshToken = req.cookies?.[REFRESH_COOKIE_NAME];
     if (!refreshToken) {
-      return res.status(401).json({ message: "Refresh token missing" });
+      throw new AppError(401, "Refresh token missing", "REFRESH_TOKEN_MISSING");
     }
     const tokens = await AuthService.refreshTokens(refreshToken);
     setRefreshTokenCookie(res, tokens.refreshToken);
