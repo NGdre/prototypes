@@ -5,10 +5,6 @@ import { startCleanupJob } from "./services/cleanup.service.js";
 import { logger } from "./utils/logger.js";
 
 const startServer = async () => {
-  logger.info("Running migrations...");
-  await db.migrate.latest();
-  logger.info("Migrations finished");
-
   startCleanupJob();
 
   const server = app.listen(env.PORT, () => {

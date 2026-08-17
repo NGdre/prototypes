@@ -57,7 +57,9 @@ export class RefreshTokenModel {
   }
 
   // Removes expired tokens; called periodically by the cleanup job.
-  static async deleteExpired(): Promise<number> {
-    return db("refresh_tokens").where("expires_at", "<", new Date()).delete();
+  static async deleteExpired(trx?: Knex.Transaction): Promise<number> {
+    return (trx ?? db)("refresh_tokens")
+      .where("expires_at", "<", new Date())
+      .delete();
   }
 }
