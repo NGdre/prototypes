@@ -2,6 +2,7 @@ import bcrypt from "bcrypt";
 import { type Knex } from "knex";
 import { v4 as uuidv4 } from "uuid";
 import db from "../config/db.js";
+import { AppError } from "../utils/AppError.js";
 import { UserProfile } from "../types/index.js";
 
 export interface UserRecord {
@@ -25,18 +26,22 @@ function toProfile(user: UserRecord): UserProfile {
   };
 }
 
+// Typed table builder: rows come back as UserRecord instead of `any`,
+// so `where({...})`, `.first()`, `.returning("*")` etc. are checked.
+const users = () => db<UserRecord>("users");
+
 export class UserModel {
   static async findByEmail(email: string): Promise<UserRecord | undefined> {
-    return db("users").where({ email }).first();
+    return users().where({ email }).first();
   }
 
   static async findByIdExternal(id: string): Promise<UserProfile | undefined> {
-    const user = await db("users").where({ id }).first();
+    const user = await users().where({ id }).first();
     return user ? toProfile(user) : undefined;
   }
 
   static async findById(id: string): Promise<UserRecord | undefined> {
-    return db("users").where({ id }).first();
+    return users().where({ id }).first();
   }
 
   static async create(email: string, password: string): Promise<UserRecord> {
@@ -44,15 +49,17 @@ export class UserModel {
     const hashed = await bcrypt.hash(password, salt);
     const id = uuidv4();
     try {
-      await db("users").insert({ id, email, password: hashed });
+      const rows = await users()
+        .insert({ id, email, password: hashed })
+        .returning("*");
+      return rows[0]!;
     } catch (error) {
       const uniquenessConstraintCode = "23505";
       if ((error as { code?: string }).code === uniquenessConstraintCode) {
-        throw new Error("Email already registered");
+        throw new AppError(409, "Email already registered", "EMAIL_EXISTS");
       }
       throw error;
     }
-    return (await db("users").where({ id }).first())!;
   }
 
   static async comparePassword(

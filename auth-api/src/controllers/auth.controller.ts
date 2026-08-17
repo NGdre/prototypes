@@ -1,8 +1,8 @@
 import { Request, Response } from "express";
 import { AuthService } from "../services/auth.service.js";
-import { AuthRequest } from "../types/index.js";
-import { asyncHandler } from "../utils/asyncHandler.js";
+import { AuthenticatedRequest } from "../types/index.js";
 import { AppError } from "../utils/AppError.js";
+import { asyncHandler } from "../utils/asyncHandler.js";
 import {
   clearRefreshTokenCookie,
   REFRESH_COOKIE_NAME,
@@ -47,17 +47,17 @@ export class AuthController {
     res.status(204).send();
   });
 
-  static me = asyncHandler(async (req: AuthRequest, res: Response) => {
-    const user = await AuthService.getProfile(req.userId!);
+  static me = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+    const user = await AuthService.getProfile(req.userId);
     res.status(200).json({ user });
   });
 
   static changePassword = asyncHandler(
-    async (req: AuthRequest, res: Response) => {
+    async (req: AuthenticatedRequest, res: Response) => {
       const { currentPassword, newPassword } = req.body;
 
       await AuthService.changePassword(
-        req.userId!,
+        req.userId,
         currentPassword,
         newPassword,
       );
@@ -86,19 +86,21 @@ export class AuthController {
   });
 
   static resendVerification = asyncHandler(
-    async (req: AuthRequest, res: Response) => {
-      await AuthService.resendVerification(req.userId!);
+    async (req: AuthenticatedRequest, res: Response) => {
+      await AuthService.resendVerification(req.userId);
       res.status(200).json({ message: "Verification email sent" });
     },
   );
 
-  static changeEmail = asyncHandler(async (req: AuthRequest, res: Response) => {
-    const { newEmail, password } = req.body;
-    await AuthService.requestEmailChange(req.userId!, newEmail, password);
-    res.status(200).json({
-      message: "Confirmation link sent to the new email address",
-    });
-  });
+  static changeEmail = asyncHandler(
+    async (req: AuthenticatedRequest, res: Response) => {
+      const { newEmail, password } = req.body;
+      await AuthService.requestEmailChange(req.userId, newEmail, password);
+      res.status(200).json({
+        message: "Confirmation link sent to the new email address",
+      });
+    },
+  );
 
   static confirmEmailChange = asyncHandler(
     async (req: Request, res: Response) => {

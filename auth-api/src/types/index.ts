@@ -1,15 +1,5 @@
 import { Request } from "express";
 
-export interface IUser {
-  id: string;
-  email: string;
-  password: string;
-  email_verified: boolean;
-  email_verified_at: Date | null;
-  created_at: Date;
-  updated_at: Date;
-}
-
 export interface IRefreshToken {
   id: string;
   user_id: string;
@@ -25,6 +15,13 @@ export type VerificationTokenType =
 
 export interface AuthRequest extends Request {
   userId?: string;
+}
+
+// For handlers mounted behind the authenticate middleware: it has already
+// resolved and assigned req.userId, so the field is guaranteed to be set
+// (no non-null assertions needed in handlers).
+export interface AuthenticatedRequest extends Request {
+  userId: string;
 }
 
 export interface TokenPayload {

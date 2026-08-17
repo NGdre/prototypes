@@ -16,6 +16,11 @@ export const authenticate = (
   }
 
   const token = authHeader.split(" ")[1];
+  if (!token) {
+    return next(
+      new AppError(401, "Access token missing", "ACCESS_TOKEN_MISSING"),
+    );
+  }
   try {
     const decoded = verifyAccessToken(token);
     req.userId = decoded.userId;

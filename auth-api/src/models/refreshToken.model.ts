@@ -11,6 +11,12 @@ export interface RefreshTokenRecord {
   created_at: Date;
 }
 
+// Typed table builder usable both on the pool and inside a transaction.
+const refreshTokens = (trx?: Knex.Transaction) =>
+  trx
+    ? trx<RefreshTokenRecord>("refresh_tokens")
+    : db<RefreshTokenRecord>("refresh_tokens");
+
 export class RefreshTokenModel {
   static async create(
     userId: string,
@@ -18,7 +24,7 @@ export class RefreshTokenModel {
     expiresAt: Date,
     trx?: Knex.Transaction,
   ): Promise<void> {
-    await (trx ?? db)("refresh_tokens").insert({
+    await refreshTokens(trx).insert({
       id: uuidv4(),
       user_id: userId,
       // Persist only the hash: if the DB is leaked, the stored values cannot
@@ -33,7 +39,7 @@ export class RefreshTokenModel {
     trx?: Knex.Transaction,
     forUpdate = false,
   ): Promise<RefreshTokenRecord | undefined> {
-    const query = (trx ?? db)("refresh_tokens").where({
+    const query = refreshTokens(trx).where({
       token: hashToken(rawToken),
     });
     if (forUpdate) query.forUpdate();
@@ -44,22 +50,18 @@ export class RefreshTokenModel {
     rawToken: string,
     trx?: Knex.Transaction,
   ): Promise<void> {
-    await (trx ?? db)("refresh_tokens")
-      .where({ token: hashToken(rawToken) })
-      .delete();
+    await refreshTokens(trx).where({ token: hashToken(rawToken) }).delete();
   }
 
   static async deleteAllForUser(
     userId: string,
     trx?: Knex.Transaction,
   ): Promise<void> {
-    await (trx ?? db)("refresh_tokens").where({ user_id: userId }).delete();
+    await refreshTokens(trx).where({ user_id: userId }).delete();
   }
 
   // Removes expired tokens; called periodically by the cleanup job.
   static async deleteExpired(trx?: Knex.Transaction): Promise<number> {
-    return (trx ?? db)("refresh_tokens")
-      .where("expires_at", "<", new Date())
-      .delete();
+    return refreshTokens(trx).where("expires_at", "<", new Date()).delete();
   }
 }

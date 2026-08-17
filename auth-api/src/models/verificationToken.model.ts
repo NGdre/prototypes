@@ -16,6 +16,12 @@ export interface VerificationTokenRecord {
   updated_at: Date;
 }
 
+// Typed table builder usable both on the pool and inside a transaction.
+const verificationTokens = (trx?: Knex.Transaction) =>
+  trx
+    ? trx<VerificationTokenRecord>("verification_tokens")
+    : db<VerificationTokenRecord>("verification_tokens");
+
 export class VerificationTokenModel {
   static async create(
     userId: string,
@@ -24,7 +30,7 @@ export class VerificationTokenModel {
     expiresAt: Date,
     metadata?: Record<string, unknown>,
   ): Promise<void> {
-    await db("verification_tokens").insert({
+    await verificationTokens().insert({
       id: uuidv4(),
       user_id: userId,
       type,
@@ -39,7 +45,7 @@ export class VerificationTokenModel {
     userId: string,
     type: VerificationTokenType,
   ): Promise<void> {
-    await db("verification_tokens")
+    await verificationTokens()
       .where({ user_id: userId, type })
       .whereNull("used_at")
       .update({ used_at: new Date() });
@@ -53,7 +59,7 @@ export class VerificationTokenModel {
 
     // Type is part of the lookup: an email_verify token must not be
     // redeemable at /reset-password and vice versa.
-    return db("verification_tokens")
+    return verificationTokens()
       .where({ token_hash: tokenHash, type })
       .whereNull("used_at")
       .where("expires_at", ">", new Date())
@@ -61,14 +67,12 @@ export class VerificationTokenModel {
   }
 
   static async markUsed(id: string, trx?: Knex.Transaction): Promise<void> {
-    await (trx ?? db)("verification_tokens")
-      .where({ id })
-      .update({ used_at: new Date() });
+    await verificationTokens(trx).where({ id }).update({ used_at: new Date() });
   }
 
   // Removes expired tokens; called periodically by the cleanup job.
   static async deleteExpired(trx?: Knex.Transaction): Promise<number> {
-    return (trx ?? db)("verification_tokens")
+    return verificationTokens(trx)
       .where("expires_at", "<", new Date())
       .delete();
   }

@@ -91,7 +91,9 @@ export const env = {
 
 export function parseExpiryToMs(expiry: string): number {
   const match = expiry.match(/^(\d+)([smhd])$/);
-  if (!match) throw new Error(`Invalid expiry format: ${expiry}`);
+  if (!match || match[1] === undefined || match[2] === undefined) {
+    throw new Error(`Invalid expiry format: ${expiry}`);
+  }
 
   const value = parseInt(match[1], 10);
   const unit = match[2];
