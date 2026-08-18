@@ -1,14 +1,17 @@
 import crypto from "crypto";
 
-export function generateSecureToken(): string {
-  return crypto.randomBytes(32).toString("hex");
+export type SecureToken = string & { readonly __brand: "SecureToken" };
+export type TokenHash = string & { readonly __brand: "TokenHash" };
+
+export function generateSecureToken(): SecureToken {
+  return crypto.randomBytes(32).toString("hex") as SecureToken;
 }
 
-export function hashToken(token: string): string {
-  return crypto.createHash("sha256").update(token).digest("hex");
+export function hashToken(token: string): TokenHash {
+  return crypto.createHash("sha256").update(token).digest("hex") as TokenHash;
 }
 
-export function compareToken(token: string, hash: string): boolean {
+export function compareToken(token: string, hash: TokenHash): boolean {
   const computedHash = crypto.createHash("sha256").update(token).digest("hex");
 
   const hashBuffer = Buffer.from(hash, "hex");

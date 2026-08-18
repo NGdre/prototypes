@@ -2,13 +2,13 @@ import { type Knex } from "knex";
 import { v4 as uuidv4 } from "uuid";
 import db from "../config/db.js";
 import { VerificationTokenType } from "../types/index.js";
-import { hashToken } from "../utils/token.js";
+import { TokenHash, hashToken } from "../utils/token.js";
 
 export interface VerificationTokenRecord {
   id: string;
   user_id: string;
   type: VerificationTokenType;
-  token_hash: string;
+  token_hash: TokenHash;
   metadata: Record<string, unknown> | null;
   expires_at: Date;
   used_at: Date | null;
@@ -26,7 +26,7 @@ export class VerificationTokenModel {
   static async create(
     userId: string,
     type: VerificationTokenType,
-    tokenHash: string,
+    tokenHash: TokenHash,
     expiresAt: Date,
     metadata?: Record<string, unknown>,
   ): Promise<void> {

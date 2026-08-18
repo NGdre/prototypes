@@ -1,12 +1,12 @@
 import { type Knex } from "knex";
 import { v4 as uuidv4 } from "uuid";
 import db from "../config/db.js";
-import { hashToken } from "../utils/token.js";
+import { TokenHash, hashToken } from "../utils/token.js";
 
 export interface RefreshTokenRecord {
   id: string;
   user_id: string;
-  token: string; // sha256 hash of the raw refresh token (never the JWT itself)
+  token: TokenHash; // sha256 hash of the raw refresh token (never the JWT itself)
   expires_at: Date;
   created_at: Date;
 }
