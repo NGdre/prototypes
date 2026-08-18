@@ -1,52 +1,20 @@
 import { Router } from "express";
-import { z } from "zod";
 import { AuthController } from "../controllers/auth.controller.js";
 import { authenticate } from "../middlewares/authenticate.js";
 import { credentialRateLimiter } from "../middlewares/rateLimiter.js";
 import { validate } from "../middlewares/validate.js";
+import {
+  changeEmailSchema,
+  changePasswordSchema,
+  confirmEmailChangeSchema,
+  forgotPasswordSchema,
+  loginSchema,
+  registerSchema,
+  resetPasswordSchema,
+  verifyEmailSchema,
+} from "../schemas/auth.schema.js";
 
 const router: Router = Router();
-
-const passwordSchema = z
-  .string()
-  .min(8, "Password must be at least 8 characters");
-
-const registerSchema = z.object({
-  email: z.email("Invalid email"),
-  password: passwordSchema,
-});
-
-const loginSchema = z.object({
-  email: z.email("Invalid email"),
-  password: z.string().min(1, "Password is required"),
-});
-
-const changePasswordSchema = z.object({
-  currentPassword: z.string().min(1, "Current password is required"),
-  newPassword: passwordSchema,
-});
-
-const forgotPasswordSchema = z.object({
-  email: z.email("Invalid email"),
-});
-
-const resetPasswordSchema = z.object({
-  token: z.string().min(1, "Token is required"),
-  newPassword: passwordSchema,
-});
-
-const verifyEmailSchema = z.object({
-  token: z.string().min(1, "Token is required"),
-});
-
-const changeEmailSchema = z.object({
-  newEmail: z.email("Invalid email"),
-  password: z.string().min(1, "Password is required"),
-});
-
-const confirmEmailChangeSchema = z.object({
-  token: z.string().min(1, "Token is required"),
-});
 
 router.post("/register", validate(registerSchema), AuthController.register);
 router.post(

@@ -18,9 +18,13 @@ export interface AuthRequest extends Request {
 }
 
 // For handlers mounted behind the authenticate middleware: it has already
-// resolved and assigned req.userId, so the field is guaranteed to be set
-// (no non-null assertions needed in handlers).
-export interface AuthenticatedRequest extends Request {
+// resolved and assigned req.userId, so the field is guaranteed to be set.
+// ReqBody types the request body, e.g. AuthenticatedRequest<ChangePasswordBody>.
+export interface AuthenticatedRequest<ReqBody = any> extends Request<
+  {},
+  {},
+  ReqBody
+> {
   userId: string;
 }
 
