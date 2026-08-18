@@ -1,6 +1,7 @@
 import nodemailer from "nodemailer";
 import { env } from "../config/env.js";
 import { logger } from "../utils/logger.js";
+import { type SecureToken } from "../utils/token.js";
 
 const transporter = env.SMTP_HOST
   ? nodemailer.createTransport({
@@ -14,12 +15,16 @@ const transporter = env.SMTP_HOST
     })
   : null;
 
-function buildLink(path: string, token: string): string {
+function buildLink(path: string, token: SecureToken): string {
   const base = env.FRONTEND_URL.replace(/\/$/, "");
   return `${base}${path}?token=${token}`;
 }
 
-async function sendMail(to: string, subject: string, html: string) {
+async function sendMail(
+  to: string,
+  subject: string,
+  html: string,
+): Promise<void> {
   if (!transporter) {
     logger.info(`[Email] To: ${to} | Subject: ${subject}\n${html}`);
     return;
@@ -34,7 +39,10 @@ async function sendMail(to: string, subject: string, html: string) {
 }
 
 export class EmailService {
-  static async sendVerificationEmail(email: string, token: string) {
+  static async sendVerificationEmail(
+    email: string,
+    token: SecureToken,
+  ): Promise<void> {
     const link = buildLink("/verify-email", token);
     await sendMail(
       email,
@@ -45,7 +53,10 @@ export class EmailService {
     );
   }
 
-  static async sendPasswordResetEmail(email: string, token: string) {
+  static async sendPasswordResetEmail(
+    email: string,
+    token: SecureToken,
+  ): Promise<void> {
     const link = buildLink("/reset-password", token);
     await sendMail(
       email,
@@ -57,7 +68,10 @@ export class EmailService {
     );
   }
 
-  static async sendEmailChangeConfirmation(email: string, token: string) {
+  static async sendEmailChangeConfirmation(
+    email: string,
+    token: SecureToken,
+  ): Promise<void> {
     const link = buildLink("/confirm-email-change", token);
     await sendMail(
       email,
@@ -68,7 +82,9 @@ export class EmailService {
     );
   }
 
-  static async sendPasswordChangedNotification(email: string) {
+  static async sendPasswordChangedNotification(
+    email: string,
+  ): Promise<void> {
     await sendMail(
       email,
       "Your password has been changed",
@@ -80,7 +96,7 @@ export class EmailService {
   static async sendEmailChangedNotification(
     oldEmail: string,
     newEmail: string,
-  ) {
+  ): Promise<void> {
     await sendMail(
       oldEmail,
       "Your email address has been changed",

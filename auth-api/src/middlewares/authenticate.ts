@@ -1,10 +1,10 @@
-import { NextFunction, Response } from "express";
-import { AuthRequest } from "../types/index.js";
+import { NextFunction, Request, Response } from "express";
+import { AuthenticatedRequest } from "../types/index.js";
 import { AppError } from "../utils/AppError.js";
 import { verifyAccessToken } from "../utils/jwt.js";
 
 export const authenticate = (
-  req: AuthRequest,
+  req: Request,
   res: Response,
   next: NextFunction,
 ) => {
@@ -23,7 +23,7 @@ export const authenticate = (
   }
   try {
     const decoded = verifyAccessToken(token);
-    req.userId = decoded.userId;
+    (req as AuthenticatedRequest).userId = decoded.userId;
     next();
   } catch (error) {
     next(

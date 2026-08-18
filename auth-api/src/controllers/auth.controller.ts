@@ -10,7 +10,10 @@ import {
   VerifyEmailBody,
 } from "../schemas/auth.schema.js";
 import { AuthService } from "../services/auth.service.js";
-import { AuthenticatedRequest } from "../types/index.js";
+import {
+  AuthenticatedRequest,
+  BodyRequest,
+} from "../types/index.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { AppError } from "../utils/AppError.js";
 import {
@@ -21,7 +24,7 @@ import {
 
 export class AuthController {
   static register = asyncHandler(
-    async (req: Request<{}, {}, RegisterBody>, res: Response) => {
+    async (req: BodyRequest<RegisterBody>, res: Response) => {
       const { email, password } = req.body;
       const result = await AuthService.register(email, password);
       res.status(201).json(result);
@@ -29,7 +32,7 @@ export class AuthController {
   );
 
   static login = asyncHandler(
-    async (req: Request<{}, {}, LoginBody>, res: Response) => {
+    async (req: BodyRequest<LoginBody>, res: Response) => {
       const { email, password } = req.body;
       const { user, accessToken, refreshToken } = await AuthService.login(
         email,
@@ -76,7 +79,7 @@ export class AuthController {
   );
 
   static forgotPassword = asyncHandler(
-    async (req: Request<{}, {}, ForgotPasswordBody>, res: Response) => {
+    async (req: BodyRequest<ForgotPasswordBody>, res: Response) => {
       const { email } = req.body;
       await AuthService.requestPasswordReset(email);
       res.status(200).json({
@@ -86,7 +89,7 @@ export class AuthController {
   );
 
   static resetPassword = asyncHandler(
-    async (req: Request<{}, {}, ResetPasswordBody>, res: Response) => {
+    async (req: BodyRequest<ResetPasswordBody>, res: Response) => {
       const { token, newPassword } = req.body;
       await AuthService.resetPassword(token, newPassword);
       res.status(200).json({ message: "Password reset successfully" });
@@ -94,7 +97,7 @@ export class AuthController {
   );
 
   static verifyEmail = asyncHandler(
-    async (req: Request<{}, {}, VerifyEmailBody>, res: Response) => {
+    async (req: BodyRequest<VerifyEmailBody>, res: Response) => {
       const { token } = req.body;
       await AuthService.verifyEmail(token);
       res.status(200).json({ message: "Email verified successfully" });
@@ -119,7 +122,7 @@ export class AuthController {
   );
 
   static confirmEmailChange = asyncHandler(
-    async (req: Request<{}, {}, ConfirmEmailChangeBody>, res: Response) => {
+    async (req: BodyRequest<ConfirmEmailChangeBody>, res: Response) => {
       const { token } = req.body;
       await AuthService.confirmEmailChange(token);
       res.status(200).json({ message: "Email updated successfully" });

@@ -1,17 +1,27 @@
 import bcrypt from "bcrypt";
-import { env, parseExpiryToMs } from "../config/env.js";
 import db from "../config/db.js";
+import { env, parseExpiryToMs } from "../config/env.js";
 import { RefreshTokenModel } from "../models/refreshToken.model.js";
 import { UserModel } from "../models/user.model.js";
 import { VerificationTokenModel } from "../models/verificationToken.model.js";
-import { TokenPayload, VerificationTokenType } from "../types/index.js";
+import {
+  LoginResult,
+  RefreshResult,
+  TokenPayload,
+  UserProfile,
+  VerificationTokenType,
+} from "../types/index.js";
+import { AppError } from "../utils/AppError.js";
 import {
   generateAccessToken,
   generateRefreshToken,
   verifyRefreshToken,
 } from "../utils/jwt.js";
-import { generateSecureToken, hashToken } from "../utils/token.js";
-import { AppError } from "../utils/AppError.js";
+import {
+  generateSecureToken,
+  hashToken,
+  type SecureToken,
+} from "../utils/token.js";
 import { EmailService } from "./email.service.js";
 
 // Hash of a throwaway password: bcrypt.compare against it is run when the
@@ -24,14 +34,23 @@ export class AuthService {
   private static async createVerificationToken(
     userId: string,
     type: VerificationTokenType,
-    expiryEnv: string,
     metadata?: Record<string, unknown>,
-  ): Promise<string> {
+  ): Promise<SecureToken> {
+    // Token lifetime is read from env; the key for each token type is fixed
+    // here (renaming a property in env.ts becomes a compile error).
+    const tokenExpiryEnvKey = {
+      email_verify: "EMAIL_VERIFY_TOKEN_EXPIRY",
+      email_change: "EMAIL_VERIFY_TOKEN_EXPIRY",
+      password_reset: "PASSWORD_RESET_TOKEN_EXPIRY",
+    } as const;
+
     await VerificationTokenModel.invalidateByType(userId, type);
 
     const rawToken = generateSecureToken();
     const tokenHash = hashToken(rawToken);
-    const expiresAt = new Date(Date.now() + parseExpiryToMs(expiryEnv));
+    const expiresAt = new Date(
+      Date.now() + parseExpiryToMs(env[tokenExpiryEnvKey[type]]),
+    );
 
     await VerificationTokenModel.create(
       userId,
@@ -44,7 +63,10 @@ export class AuthService {
     return rawToken;
   }
 
-  static async register(email: string, password: string) {
+  static async register(
+    email: string,
+    password: string,
+  ): Promise<{ message: string }> {
     const existing = await UserModel.findByEmail(email);
     if (existing) {
       // A dummy bcrypt.compare burns roughly the same CPU time as the real
@@ -63,7 +85,6 @@ export class AuthService {
     const verifyToken = await this.createVerificationToken(
       user.id,
       "email_verify",
-      env.EMAIL_VERIFY_TOKEN_EXPIRY,
     );
     await EmailService.sendVerificationEmail(email, verifyToken);
 
@@ -73,7 +94,7 @@ export class AuthService {
     return { message: "Registration successful" };
   }
 
-  static async login(email: string, password: string) {
+  static async login(email: string, password: string): Promise<LoginResult> {
     const user = await UserModel.findByEmail(email);
     if (!user) {
       // Dummy bcrypt.compare equalizes response time: otherwise account
@@ -109,21 +130,16 @@ export class AuthService {
     };
   }
 
-  static async refreshTokens(oldRefreshToken: string) {
+  static async refreshTokens(oldRefreshToken: string): Promise<RefreshResult> {
     let payload: TokenPayload;
     try {
       payload = verifyRefreshToken(oldRefreshToken);
     } catch (err) {
-      throw new AppError(
-        401,
-        "Invalid refresh token",
-        "INVALID_REFRESH_TOKEN",
-      );
+      throw new AppError(401, "Invalid refresh token", "INVALID_REFRESH_TOKEN");
     }
 
     const user = await UserModel.findById(payload.userId);
-    if (!user)
-      throw new AppError(404, "User not found", "USER_NOT_FOUND");
+    if (!user) throw new AppError(404, "User not found", "USER_NOT_FOUND");
 
     const newPayload: TokenPayload = {
       userId: payload.userId,
@@ -140,10 +156,9 @@ export class AuthService {
     // UPDATE so a concurrent request carrying the same token blocks here
     // and then sees no row – it is treated as reuse and revokes all tokens.
     await db.transaction(async (trx) => {
-      const stored = await RefreshTokenModel.findByToken(
+      const stored = await RefreshTokenModel.findByTokenForUpdate(
         oldRefreshToken,
         trx,
-        true,
       );
       if (!stored || stored.expires_at < new Date()) {
         if (stored) {
@@ -157,17 +172,22 @@ export class AuthService {
       }
 
       await RefreshTokenModel.deleteByToken(oldRefreshToken, trx);
-      await RefreshTokenModel.create(payload.userId, newRefreshToken, expiresAt, trx);
+      await RefreshTokenModel.create(
+        payload.userId,
+        newRefreshToken,
+        expiresAt,
+        trx,
+      );
     });
 
     return { accessToken: newAccessToken, refreshToken: newRefreshToken };
   }
 
-  static async logout(refreshToken: string) {
+  static async logout(refreshToken: string): Promise<void> {
     await RefreshTokenModel.deleteByToken(refreshToken);
   }
 
-  static async getProfile(userId: string) {
+  static async getProfile(userId: string): Promise<UserProfile> {
     const user = await UserModel.findByIdExternal(userId);
     if (!user) throw new AppError(404, "User not found", "USER_NOT_FOUND");
     return user;
@@ -177,7 +197,7 @@ export class AuthService {
     userId: string,
     currentPassword: string,
     newPassword: string,
-  ) {
+  ): Promise<void> {
     const user = await UserModel.findById(userId);
     if (!user) throw new AppError(404, "User not found", "USER_NOT_FOUND");
 
@@ -200,24 +220,27 @@ export class AuthService {
     await EmailService.sendPasswordChangedNotification(user.email);
   }
 
-  static async requestPasswordReset(email: string) {
+  static async requestPasswordReset(email: string): Promise<void> {
     const user = await UserModel.findByEmail(email);
     if (!user) return;
 
     const resetToken = await this.createVerificationToken(
       user.id,
       "password_reset",
-      env.PASSWORD_RESET_TOKEN_EXPIRY,
     );
     await EmailService.sendPasswordResetEmail(email, resetToken);
   }
 
-  static async resetPassword(token: string, newPassword: string) {
+  static async resetPassword(
+    token: string,
+    newPassword: string,
+  ): Promise<void> {
     const record = await VerificationTokenModel.findValid(
       token,
       "password_reset",
     );
-    if (!record) throw new AppError(400, "Invalid or expired token", "INVALID_TOKEN");
+    if (!record)
+      throw new AppError(400, "Invalid or expired token", "INVALID_TOKEN");
 
     // Password change, token invalidation and session revocation are atomic:
     // a partial failure must not leave the token replayable or old sessions alive.
@@ -231,27 +254,31 @@ export class AuthService {
     if (user) await EmailService.sendPasswordChangedNotification(user.email);
   }
 
-  static async verifyEmail(token: string) {
+  static async verifyEmail(token: string): Promise<void> {
     const record = await VerificationTokenModel.findValid(
       token,
       "email_verify",
     );
-    if (!record) throw new AppError(400, "Invalid or expired token", "INVALID_TOKEN");
+    if (!record)
+      throw new AppError(400, "Invalid or expired token", "INVALID_TOKEN");
 
     await UserModel.markEmailVerified(record.user_id);
     await VerificationTokenModel.markUsed(record.id);
   }
 
-  static async resendVerification(userId: string) {
+  static async resendVerification(userId: string): Promise<void> {
     const user = await UserModel.findById(userId);
     if (!user) throw new AppError(404, "User not found", "USER_NOT_FOUND");
     if (user.email_verified)
-      throw new AppError(409, "Email already verified", "EMAIL_ALREADY_VERIFIED");
+      throw new AppError(
+        409,
+        "Email already verified",
+        "EMAIL_ALREADY_VERIFIED",
+      );
 
     const verifyToken = await this.createVerificationToken(
       user.id,
       "email_verify",
-      env.EMAIL_VERIFY_TOKEN_EXPIRY,
     );
     await EmailService.sendVerificationEmail(user.email, verifyToken);
   }
@@ -260,7 +287,7 @@ export class AuthService {
     userId: string,
     newEmail: string,
     password: string,
-  ) {
+  ): Promise<void> {
     const user = await UserModel.findById(userId);
     if (!user) throw new AppError(404, "User not found", "USER_NOT_FOUND");
 
@@ -288,18 +315,18 @@ export class AuthService {
     const changeToken = await this.createVerificationToken(
       userId,
       "email_change",
-      env.EMAIL_VERIFY_TOKEN_EXPIRY,
       { pendingEmail: newEmail },
     );
     await EmailService.sendEmailChangeConfirmation(newEmail, changeToken);
   }
 
-  static async confirmEmailChange(token: string) {
+  static async confirmEmailChange(token: string): Promise<void> {
     const record = await VerificationTokenModel.findValid(
       token,
       "email_change",
     );
-    if (!record) throw new AppError(400, "Invalid or expired token", "INVALID_TOKEN");
+    if (!record)
+      throw new AppError(400, "Invalid or expired token", "INVALID_TOKEN");
 
     const pendingEmail = record.metadata?.pendingEmail as string | undefined;
     if (!pendingEmail)

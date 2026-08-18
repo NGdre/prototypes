@@ -37,13 +37,23 @@ export class RefreshTokenModel {
   static async findByToken(
     rawToken: string,
     trx?: Knex.Transaction,
-    forUpdate = false,
   ): Promise<RefreshTokenRecord | undefined> {
-    const query = refreshTokens(trx).where({
-      token: hashToken(rawToken),
-    });
-    if (forUpdate) query.forUpdate();
-    return query.first();
+    return refreshTokens(trx)
+      .where({ token: hashToken(rawToken) })
+      .first();
+  }
+
+  // Variant for the rotation flow: the row is locked with FOR UPDATE so a
+  // concurrent request carrying the same token blocks here, sees no row
+  // after commit, and is treated as reuse.
+  static async findByTokenForUpdate(
+    rawToken: string,
+    trx?: Knex.Transaction,
+  ): Promise<RefreshTokenRecord | undefined> {
+    return refreshTokens(trx)
+      .where({ token: hashToken(rawToken) })
+      .forUpdate()
+      .first();
   }
 
   static async deleteByToken(

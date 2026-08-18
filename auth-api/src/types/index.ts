@@ -1,21 +1,9 @@
 import { Request } from "express";
 
-export interface IRefreshToken {
-  id: string;
-  user_id: string;
-  token: string;
-  expires_at: Date;
-  created_at: Date;
-}
-
 export type VerificationTokenType =
   | "password_reset"
   | "email_verify"
   | "email_change";
-
-export interface AuthRequest extends Request {
-  userId?: string;
-}
 
 // For handlers mounted behind the authenticate middleware: it has already
 // resolved and assigned req.userId, so the field is guaranteed to be set.
@@ -27,6 +15,8 @@ export interface AuthenticatedRequest<ReqBody = any> extends Request<
 > {
   userId: string;
 }
+
+export type BodyRequest<ReqBody = any> = Request<{}, {}, ReqBody>;
 
 export interface TokenPayload {
   userId: string;
@@ -40,4 +30,21 @@ export interface UserProfile {
   emailVerifiedAt: Date | null;
   created_at: Date;
   updated_at: Date;
+}
+
+export interface PublicUser {
+  id: string;
+  email: string;
+  emailVerified: boolean;
+}
+
+export interface LoginResult {
+  user: PublicUser;
+  accessToken: string;
+  refreshToken: string;
+}
+
+export interface RefreshResult {
+  accessToken: string;
+  refreshToken: string;
 }
